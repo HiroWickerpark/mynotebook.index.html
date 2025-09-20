@@ -207,4 +207,4 @@
     renderHistory();
   </script>
 </body>
-</html># mynotebook.index.html
+</html>
