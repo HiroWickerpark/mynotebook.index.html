@@ -2,209 +2,130 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>単語帳アプリ（完成版）</title>
+  <title>単語帳アプリ</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; }
-    input { margin: 5px; padding: 5px; }
-    button { margin: 5px; padding: 6px 12px; }
-    .card {
-      border: 1px solid #333; border-radius: 10px;
-      width: 250px; height: 150px; margin: 20px auto;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; cursor: pointer; background: #f8f8f8;
-    }
-    ul { list-style: none; padding: 0; }
-    li { margin: 5px 0; }
-    .delete-btn { margin-left: 10px; color: red; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .card { border: 1px solid #ccc; padding: 15px; border-radius: 10px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.1); max-width: 400px; margin: 10px auto; }
+    .hidden { display: none; }
+    input, button { margin: 5px 0; padding: 8px; width: 100%; }
+    .word-item { margin: 5px 0; padding: 5px; border-bottom: 1px solid #ddd; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>単語帳（完成版）</h1>
 
+<h1>単語帳アプリ</h1>
+
+<div class="card">
   <h2>単語を追加</h2>
-  <input id="term" placeholder="単語">
-  <input id="meaning" placeholder="意味">
-  <button onclick="addWord()">追加</button>
+  <input type="text" id="wordInput" placeholder="単語を入力">
+  <input type="text" id="meaningInput" placeholder="意味を入力">
+  <button id="addButton">追加</button>
+</div>
 
-  <h2>登録済みの単語</h2>
-  <ul id="wordList"></ul>
+<div class="card">
+  <button id="randomButton">ランダム問題を出す</button>
+</div>
 
-  <h2>フラッシュカード</h2>
-  <div id="card" class="card" onclick="flipCard()">ここに表示</div>
-  <button onclick="prevCard()">前へ</button>
-  <button onclick="nextCard()">次へ</button>
-  <br>
-  <button onclick="markHard()">苦手</button>
-  <button onclick="markEasy()">得意</button>
+<!-- 問題ページ -->
+<div id="questionPage" class="card hidden">
+  <h2>問題</h2>
+  <p id="questionWord"></p>
+  <button onclick="showAnswer()">答えを見る</button>
+</div>
 
-  <h2>データ管理</h2>
-  <button onclick="exportWords()">エクスポート</button>
-  <input type="file" accept="application/json" onchange="importWords(event)">
+<!-- 答えページ -->
+<div id="answerPage" class="card hidden">
+  <h2>答え</h2>
+  <p id="answerMeaning"></p>
+  <button onclick="backToQuestion()">戻る</button>
+  <button onclick="nextRandom()">次の問題へ</button>
+</div>
 
-  <h2>学習履歴</h2>
-  <div id="history">今日の学習: なし</div>
+<!-- 単語一覧 -->
+<div class="card">
+  <h2>単語一覧</h2>
+  <div id="wordList"></div>
+</div>
 
-  <script>
-    let words = JSON.parse(localStorage.getItem("words")) || [];
-    let history = JSON.parse(localStorage.getItem("history")) || {};
-    let currentIndex = 0;
-    let showMeaning = false;
+<script>
+  let words = [];
+  let currentIndex = 0;
 
-    function saveWords() {
-      localStorage.setItem("words", JSON.stringify(words));
+  const wordInput = document.getElementById('wordInput');
+  const meaningInput = document.getElementById('meaningInput');
+  const addButton = document.getElementById('addButton');
+  const randomButton = document.getElementById('randomButton');
+  const wordList = document.getElementById('wordList');
+  const questionPage = document.getElementById('questionPage');
+  const answerPage = document.getElementById('answerPage');
+  const questionWord = document.getElementById('questionWord');
+  const answerMeaning = document.getElementById('answerMeaning');
+
+  function renderList() {
+    wordList.innerHTML = '';
+    words.forEach((item, index) => {
+      const div = document.createElement('div');
+      div.className = 'word-item';
+      div.textContent = item.word;
+      div.onclick = () => startQuestion(index);
+      wordList.appendChild(div);
+    });
+  }
+
+  function startQuestion(index) {
+    currentIndex = index;
+    questionWord.textContent = words[index].word;
+    questionPage.classList.remove('hidden');
+    answerPage.classList.add('hidden');
+  }
+
+  function showAnswer() {
+    answerMeaning.textContent = words[currentIndex].meaning;
+    questionPage.classList.add('hidden');
+    answerPage.classList.remove('hidden');
+  }
+
+  function backToQuestion() {
+    questionPage.classList.remove('hidden');
+    answerPage.classList.add('hidden');
+  }
+
+  function nextRandom() {
+    if (words.length > 0) {
+      const randomIndex = Math.floor(Math.random() * words.length);
+      startQuestion(randomIndex);
+      showAnswer();
     }
+  }
 
-    function saveHistory() {
-      localStorage.setItem("history", JSON.stringify(history));
-    }
-
-    function addWord() {
-      const term = document.getElementById("term").value.trim();
-      const meaning = document.getElementById("meaning").value.trim();
-      if (term && meaning) {
-        words.push({term, meaning, score: 3}); // 初期スコアは3
-        saveWords();
-        document.getElementById("term").value = "";
-        document.getElementById("meaning").value = "";
-        renderList();
-      }
-    }
-
-    function deleteWord(index) {
-      words.splice(index, 1);
-      saveWords();
+  addButton.addEventListener('click', () => {
+    const word = wordInput.value.trim();
+    const meaning = meaningInput.value.trim();
+    if (word && meaning) {
+      words.push({ word, meaning });
       renderList();
-      showCard();
+      wordInput.value = '';
+      meaningInput.value = '';
     }
+  });
 
-    function renderList() {
-      const list = document.getElementById("wordList");
-      list.innerHTML = "";
-      words.forEach((w, i) => {
-        const li = document.createElement("li");
-        li.textContent = `${w.term} - ${w.meaning} (score:${w.score})`;
-        const btn = document.createElement("button");
-        btn.textContent = "削除";
-        btn.className = "delete-btn";
-        btn.onclick = () => deleteWord(i);
-        li.appendChild(btn);
-        list.appendChild(li);
-      });
+  randomButton.addEventListener('click', () => {
+    if (words.length > 0) {
+      const randomIndex = Math.floor(Math.random() * words.length);
+      startQuestion(randomIndex);
     }
+  });
 
-    function showCard() {
-      if (words.length === 0) {
-        document.getElementById("card").textContent = "単語がありません";
-        return;
+  // Enterキー対応
+  [wordInput, meaningInput].forEach(input => {
+    input.addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        addButton.click();
       }
-      const word = words[currentIndex];
-      document.getElementById("card").textContent = showMeaning ? word.meaning : word.term;
-    }
-
-    function flipCard() {
-      showMeaning = !showMeaning;
-      showCard();
-    }
-
-    function nextCard() {
-      if (words.length > 0) {
-        currentIndex = weightedRandomIndex();
-        showMeaning = false;
-        showCard();
-      }
-    }
-
-    function prevCard() {
-      if (words.length > 0) {
-        currentIndex = (currentIndex - 1 + words.length) % words.length;
-        showMeaning = false;
-        showCard();
-      }
-    }
-
-    // 苦手／得意
-    function markHard() {
-      if (words[currentIndex].score > 1) {
-        words[currentIndex].score--;
-      }
-      saveWords();
-      renderList();
-      addHistory("hard");
-    }
-
-    function markEasy() {
-      if (words[currentIndex].score < 5) {
-        words[currentIndex].score++;
-      }
-      saveWords();
-      renderList();
-      addHistory("easy");
-    }
-
-    // 学習履歴の追加
-    function addHistory(action) {
-      const today = new Date().toISOString().slice(0,10);
-      if (!history[today]) {
-        history[today] = {hard: 0, easy: 0};
-      }
-      history[today][action]++;
-      saveHistory();
-      renderHistory();
-    }
-
-    function renderHistory() {
-      const today = new Date().toISOString().slice(0,10);
-      const stats = history[today] || {hard:0, easy:0};
-      document.getElementById("history").textContent =
-        `今日の学習: 苦手 ${stats.hard} / 得意 ${stats.easy}`;
-    }
-
-    // スコアに応じた重み付きランダム
-    function weightedRandomIndex() {
-      let weights = words.map(w => 6 - w.score); // scoreが低いほど重みが大きい
-      let total = weights.reduce((a, b) => a + b, 0);
-      let r = Math.random() * total;
-      for (let i = 0; i < weights.length; i++) {
-        if (r < weights[i]) return i;
-        r -= weights[i];
-      }
-      return 0;
-    }
-
-    // エクスポート
-    function exportWords() {
-      const data = JSON.stringify(words, null, 2);
-      const blob = new Blob([data], {type: "application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "words.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    // インポート
-    function importWords(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const imported = JSON.parse(e.target.result);
-          words = words.concat(imported);
-          saveWords();
-          renderList();
-          showCard();
-        } catch (err) {
-          alert("読み込みエラー: JSON形式を確認してください");
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    renderList();
-    showCard();
-    renderHistory();
-  </script>
+    });
+  });
+</script>
 </body>
 </html>
